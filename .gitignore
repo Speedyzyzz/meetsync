@@ -58,3 +58,6 @@ htmlcov/
 
 # Agents metadata
 .agents/
+
+# GitHub Workflows (untracked to prevent OAuth token workflow scope restriction on push)
+.github/

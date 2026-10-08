@@ -18,6 +18,21 @@ class Settings(BaseSettings):
         "http://127.0.0.1:8000",
     ]
     
+    # Authentication & Security
+    JWT_SECRET_KEY: str = Field(
+        default="meetsync_super_secret_jwt_key_2026_change_in_production",
+        description="HMAC secret key for JWT signing"
+    )
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+
+    # Redis Queue & Caching
+    REDIS_URL: str = Field(
+        default="redis://localhost:6379/0",
+        description="Redis connection URL for async job queue"
+    )
+    RATE_LIMIT_REQUESTS_PER_MINUTE: int = 60
+
     # Database configuration
     # Default to a local SQLite database for instant zero-dependency execution,
     # or override with PostgreSQL via DATABASE_URL

@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.core.config import settings
 from backend.app.core.logging import logger
+from backend.app.core.queue import enqueue_meeting_job
 from backend.app.models.meeting import Meeting, MeetingStatus, MeetingSourceType
 from backend.app.models.transcript import Transcript, TranscriptSegment
 from backend.app.models.attendee import Attendee
@@ -76,11 +77,20 @@ class MeetingService:
         await self.repo.create_job(job)
         await self.db.commit()
 
-        # If transcript text is immediately provided, process it
-        if transcript_text:
-            await self.process_meeting(meeting.id, raw_transcript=transcript_text)
-        elif audio_file_path:
-            await self.process_meeting(meeting.id, audio_file_path=audio_file_path)
+        # Dispatch to Redis queue if worker is configured, else fallback for local dev
+        enqueued = await enqueue_meeting_job(
+            job_id=job.id,
+            meeting_id=meeting.id,
+            raw_transcript=transcript_text,
+            audio_path=audio_file_path,
+        )
+
+        if not enqueued:
+            # Local fallback when Redis daemon is not running
+            if transcript_text:
+                await self.process_meeting(meeting.id, raw_transcript=transcript_text)
+            elif audio_file_path:
+                await self.process_meeting(meeting.id, audio_file_path=audio_file_path)
 
         # Refresh meeting
         refreshed = await self.repo.get_by_id(meeting.id)

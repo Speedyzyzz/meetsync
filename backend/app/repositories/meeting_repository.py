@@ -91,18 +91,39 @@ class MeetingRepository:
     ) -> List[dict]:
         """
         Unified search querying meeting titles, summaries, decisions, and transcript segments.
-        Supports SQLite (LIKE / string matching) and PostgreSQL (ILIKE or tsvector).
+        Uses PostgreSQL native tsvector FTS (plainto_tsquery) when running on PostgreSQL,
+        with SQLite case-insensitive fallback.
         """
-        search_term = f"%{query}%"
         results = []
+        is_postgres = False
+        try:
+            bind = self.db.bind or (self.db.get_bind() if hasattr(self.db, "get_bind") else None)
+            if bind and hasattr(bind, "dialect") and bind.dialect.name == "postgresql":
+                is_postgres = True
+        except Exception:
+            pass
+
+        search_term = f"%{query}%"
 
         # 1. Search transcript segments
-        seg_stmt = (
-            select(TranscriptSegment, Meeting)
-            .join(Meeting, TranscriptSegment.meeting_id == Meeting.id)
-            .where(TranscriptSegment.text.ilike(search_term))
-            .limit(limit)
-        )
+        if is_postgres:
+            fts_filter = func.to_tsvector("english", TranscriptSegment.text).op("@@")(
+                func.plainto_tsquery("english", query)
+            )
+            seg_stmt = (
+                select(TranscriptSegment, Meeting)
+                .join(Meeting, TranscriptSegment.meeting_id == Meeting.id)
+                .where(fts_filter)
+                .limit(limit)
+            )
+        else:
+            seg_stmt = (
+                select(TranscriptSegment, Meeting)
+                .join(Meeting, TranscriptSegment.meeting_id == Meeting.id)
+                .where(TranscriptSegment.text.ilike(search_term))
+                .limit(limit)
+            )
+
         if workspace_id:
             seg_stmt = seg_stmt.where(Meeting.workspace_id == workspace_id)
         seg_res = await self.db.execute(seg_stmt)
@@ -118,16 +139,24 @@ class MeetingRepository:
             })
 
         # 2. Search meeting titles & summaries
-        meet_stmt = (
-            select(Meeting)
-            .where(
-                or_(
-                    Meeting.title.ilike(search_term),
-                    Meeting.summary.ilike(search_term),
+        if is_postgres:
+            meet_fts = func.to_tsvector(
+                "english",
+                func.concat(Meeting.title, " ", func.coalesce(Meeting.summary, ""))
+            ).op("@@")(func.plainto_tsquery("english", query))
+            meet_stmt = select(Meeting).where(meet_fts).limit(limit)
+        else:
+            meet_stmt = (
+                select(Meeting)
+                .where(
+                    or_(
+                        Meeting.title.ilike(search_term),
+                        Meeting.summary.ilike(search_term),
+                    )
                 )
+                .limit(limit)
             )
-            .limit(limit)
-        )
+
         if workspace_id:
             meet_stmt = meet_stmt.where(Meeting.workspace_id == workspace_id)
         meet_res = await self.db.execute(meet_stmt)

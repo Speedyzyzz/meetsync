@@ -1,11 +1,27 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Sparkles, LayoutDashboard, Calendar, CheckSquare, Search, PlusCircle, Activity } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Sparkles, LayoutDashboard, Calendar, CheckSquare, Search, PlusCircle, Activity, LogOut, LogIn, Building2 } from "lucide-react";
+import { getStoredAuth, clearAuth, AuthState } from "@/lib/auth";
 
 export function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [auth, setAuth] = useState<AuthState>({ token: null, user: null, workspace: null });
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    setAuth(getStoredAuth());
+  }, [pathname]);
+
+  const handleSignOut = () => {
+    clearAuth();
+    setAuth({ token: null, user: null, workspace: null });
+    router.push("/login");
+  };
 
   const navLinks = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -58,10 +74,36 @@ export function Navbar() {
 
         {/* Right action area */}
         <div className="flex items-center space-x-3">
-          <div className="hidden sm:flex items-center space-x-2 text-xs text-slate-400 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800">
+          <div className="hidden lg:flex items-center space-x-2 text-xs text-slate-400 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800">
             <Activity className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
             <span>FastAPI Core Online</span>
           </div>
+
+          {mounted && auth.user && auth.workspace ? (
+            <div className="flex items-center space-x-2.5">
+              <div className="hidden sm:flex items-center space-x-2 px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-800 text-xs text-slate-300">
+                <Building2 className="w-3.5 h-3.5 text-sky-400" />
+                <span className="font-semibold text-white">{auth.workspace.name}</span>
+                <span className="text-slate-500">•</span>
+                <span className="text-slate-400">{auth.user.name}</span>
+              </div>
+              <button
+                onClick={handleSignOut}
+                title="Sign Out"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800/60 transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <Link
+              href="/login"
+              className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Sign In</span>
+            </Link>
+          )}
 
           <Link
             href="/upload"

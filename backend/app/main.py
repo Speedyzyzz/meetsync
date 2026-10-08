@@ -1,10 +1,12 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from backend.app.core.config import settings
 from backend.app.core.database import init_db
 from backend.app.core.logging import logger
 from backend.app.api.routes import (
+    auth,
     health,
     meetings,
     action_items,
@@ -28,6 +30,18 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Global exception handler to prevent leaking stack traces or internal secrets
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception on {request.method} {request.url.path}: {str(exc)}", exc_info=True)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "detail": "An internal server error occurred. Please contact system administrator if issue persists.",
+            "status": "error",
+        },
+    )
+
 # CORS middleware configuration
 app.add_middleware(
     CORSMiddleware,
@@ -38,6 +52,7 @@ app.add_middleware(
 )
 
 # Include API routes
+app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Authentication"])
 app.include_router(health.router, prefix=settings.API_V1_STR, tags=["Health"])
 app.include_router(meetings.router, prefix=f"{settings.API_V1_STR}/meetings", tags=["Meetings"])
 app.include_router(action_items.router, prefix=f"{settings.API_V1_STR}/action-items", tags=["Action Items"])

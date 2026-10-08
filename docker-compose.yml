@@ -1,0 +1,67 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: meetsync-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-meetsync}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-meetsync_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-meetsync}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-meetsync} -d ${POSTGRES_DB:-meetsync}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: meetsync-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: meetsync-backend
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-meetsync}:${POSTGRES_PASSWORD:-meetsync_secret}@postgres:5432/${POSTGRES_DB:-meetsync}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      ENVIRONMENT: production
+      DEBUG: "false"
+    ports:
+      - "8000:8000"
+    volumes:
+      - uploads_data:/app/data/uploads
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: meetsync-frontend
+    restart: always
+    depends_on:
+      - backend
+    environment:
+      INTERNAL_API_URL: http://backend:8000
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads_data:

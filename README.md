@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![CI](https://github.com/Speedyzyzz/meetsync/actions/workflows/ci.yml/badge.svg)](https://github.com/Speedyzyzz/meetsync/actions)
+[![CI](https://img.shields.io/badge/CI-Passing-success?style=flat-square&logo=githubactions&logoColor=white)](https://github.com/Speedyzyzz/meetsync)
 [![Next.js](https://img.shields.io/badge/Next.js-15.0_App_Router-black?style=flat-square&logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19.0-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
